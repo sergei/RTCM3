@@ -58,6 +58,15 @@ class rtcm3_Definition:
                 name=line.strip()
                 self.fields.append({'type': "UINT" , 'name' : name, 'df_number':df_number, 'bitlength': bitlength ,'value':None})
 
+            elif lines[current_Line].startswith("GINT:"):
+                line = lines[current_Line][5:].strip()
+                (bitlength,sep,line)=line.partition(':')
+                bitlength=int(bitlength)
+                (df_number,sep,line)=line.partition(':')
+                df_number=int(df_number)
+                name=line.strip()
+                self.fields.append({'type': "GINT" , 'name' : name, 'df_number':df_number, 'bitlength': bitlength ,'value':None})
+
             elif lines[current_Line].startswith("REPEAT:"):
                 line = lines[current_Line][7:].strip()
                 (bitlength,sep,line)=line.partition(':')

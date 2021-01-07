@@ -64,7 +64,7 @@ if args.Explain:
     print "Dump undecoded: {},  Dump Decoded: {}, Dump TimeStamp: {}".format(
         Dump_Undecoded,
         Dump_Decoded,
-        Print_ACK_NAK,
+        #Print_ACK_NAK,
         Dump_TimeStamp)
 
 if args.None:
@@ -99,8 +99,8 @@ if args.Verbose:
 
 
 
-#input_file=open ('RTCM3.bin','rb')
-#new_data = bytearray(input_file.read(255))
+input_file=open ('dlr.bin','rb')
+new_data = bytearray(input_file.read(255))
 
 CSG_Test=False
 Looking_For_Frame=0
@@ -189,17 +189,17 @@ if CSG_Test:
 #                  print RTCM_Data
 
 else:
-   new_data = bytearray(sys.stdin.read(1))
+   # new_data = bytearray(sys.stdin.read(1))
    while (new_data):
 
        rtcm3.add_data (data=new_data)
-   #    new_data=""
+       new_data=""
        if len(rtcm3.buffer):
-   #        print str(len(rtcm3.buffer))
+           print str(len(rtcm3.buffer))
            sys.stdout.flush()
        result = rtcm3.process_data (dump_decoded=False)
        while result != 0 :
-   #        print str(datetime.now())
+           # print str(datetime.now())
            if result == Got_Undecoded :
                if Dump_Undecoded :
                    print "Undecoded Data: " +ByteToHex(rtcm3.undecoded) + " Length (%)".format(len(rtcm3.undecoded));
@@ -209,11 +209,11 @@ else:
            else :
                    print "INTERNAL ERROR: Unknown result (" + str (result) + ")";
                    sys.exit();
-   #        print "processing"
+           print "processing"
            result = rtcm3.process_data ()
-   #        print "processed: " + str(result)
-       new_data = sys.stdin.read(1)
-   #    new_data = input_file.read(255)
+           print "processed: " + str(result)
+       # new_data = sys.stdin.read(1)
+       new_data = input_file.read(255)
 
 print "Bye"
 

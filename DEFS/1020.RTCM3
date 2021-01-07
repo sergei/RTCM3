@@ -1,0 +1,28 @@
+NAME: GLONASS Ephemerides
+ID: 1020
+UINT:12:2:Message Number
+UINT:6:3:osn
+UINT:5:4:fcn
+UINT:4:5:pad1
+UINT:5:6:tk_h
+UINT:6:7:tk_m
+UINT:1:8:tk_s
+UINT:1:9:bn
+UINT:1:10:pad2
+UINT:7:11:tb
+GINT:24:12:xdot
+GINT:27:13:x
+GINT:5:14:xdot2
+GINT:24:15:ydot
+GINT:27:16:y
+GINT:5:17:ydot2
+GINT:24:18:zdot
+GINT:27:19:z
+GINT:5:20:zdot2
+UINT:1:21:pad3
+GINT:11:22:gamma
+UINT:3:23:pad4
+GINT:22:24:tau
+GINT:5:25:delta_tau
+UINT:5:26:age
+END:

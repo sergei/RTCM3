@@ -88,6 +88,30 @@ def bitValue(bitArray,Start,Length):
         s +=bitArray[i]
     return(int(s,2))
 
+def bitValueSigned(bitArray,Start,Length):
+#    print Start,Length
+    s = ""
+    for i in range (Start,Start+Length):
+        s +=bitArray[i]
+
+    if bitArray[Start] == '0':
+        return(int(s,2))
+    else:
+        # two's complement
+        return(-(((int(s,2) ^ (2**Length-1)) + 1)))
+
+def bitValueGSigned(bitArray,Start,Length):
+#    print Start,Length
+    s = ""
+    for i in range (Start,Start+Length):
+        s +=bitArray[i]
+
+    if bitArray[Start] == '0':
+        return(int(s,2))
+    else:
+        # Sign bit is one, so negative
+        return -int(s[1:],2)
+
 #(**********************************************************************
 # * Compute the CRC24 checksum using a lookup table method.
 # *
@@ -161,8 +185,12 @@ class RTCM3:
                     field["value"]= bitValue(bitArray,current_bit,field["bitlength"])
                     current_bit+=field["bitlength"]
                 elif field["type"] == "INT" :
-                    field["value"]= bitValue(bitArray,current_bit,field["bitlength"])
+                    field["value"]= bitValueSigned(bitArray,current_bit,field["bitlength"])
                     current_bit+=field["bitlength"]
+                elif field["type"] == "GINT":
+                    # Deals with GLO negative numbers
+                    field["value"] = bitValueGSigned(bitArray, current_bit, field["bitlength"])
+                    current_bit += field["bitlength"]
                 elif field["type"] == "REPEAT" :
                     field["value"]= bitValue(bitArray,current_bit,field["bitlength"])
                     current_bit+=field["bitlength"]
@@ -184,7 +212,7 @@ class RTCM3:
     def process_data (self, dump_decoded=False):
 
         if len (self.buffer) <  RTCM3_Min_Size :
-#            print "To short"
+            print "Too short"
             return Need_More
 
         if self.buffer[0] <> RTCM3_Preamble : # {It isn't a valid packet, skip to first start}
@@ -200,19 +228,19 @@ class RTCM3:
         self.packet_Length = (self.buffer[RTCM3_Length_Location] & 0x03);
         self.packet_Length = self.packet_Length << 8;
         self.packet_Length = self.packet_Length | self.buffer[RTCM3_Length_Location+1];
-#        print "Packet Length: {:X}".format(self.packet_Length)
+        print "Packet Length: {:X}".format(self.packet_Length)
 
         if (self.packet_Length+RTCM3_Min_Size) > len(self.buffer):
             return Need_More
 
         Computed_CRC = crc_normal(self.buffer[0:self.packet_Length+ RTCM3_First_Data_Location]);
-#        print "Computed CRC {:X}".format(Computed_CRC)
+        print "Computed CRC {:X}".format(Computed_CRC)
         CRC = self.buffer[RTCM3_First_Data_Location + self.packet_Length];
         CRC = CRC << 8;
         CRC = CRC | self.buffer[RTCM3_First_Data_Location + self.packet_Length+1];
         CRC = CRC << 8;
         CRC = CRC | self.buffer[RTCM3_First_Data_Location + self.packet_Length+2];
-#        print "CRC {:X}".format(CRC)
+        print "CRC {:X}".format(CRC)
 
 
         if CRC == Computed_CRC:
@@ -220,15 +248,15 @@ class RTCM3:
             self.packet_ID = self.packet_ID << 4;
             self.packet_ID = self.packet_ID | ((self.buffer[RTCM3_First_Data_Location+1] >> 4) & 0x0F);
             self.packet=self.buffer[:self.packet_Length + RTCM3_Min_Size]
-#            print "Packet"
-#            print ByteToHex(self.packet)
+            print "Packet"
+            print ByteToHex(self.packet)
             packet_data=self.packet[RTCM3_First_Data_Location:self.packet_Length+RTCM3_First_Data_Location] # The packet
             self.buffer=self.buffer[self.packet_Length + RTCM3_Min_Size:]
             self.undecoded=bytearray("")
             self.decode(self.packet_ID,packet_data)
             return Got_Packet
         else:
-#            print "Invalid"
+            print "Invalid"
             del self.buffer[0] #Always delete the first byte since it failed the CRC
             if self.buffer[0] <> RTCM3_Preamble : # {It isn't a valid packet, skip to first start}
                 for i  in range (0,len(self.buffer)):
