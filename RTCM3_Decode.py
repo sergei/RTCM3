@@ -111,7 +111,7 @@ if __name__ == '__main__':
         rtcm3.add_data(data=new_data)
         new_data = ""
         if len(rtcm3.buffer):
-            print str(len(rtcm3.buffer))
+            # print str(len(rtcm3.buffer))
             sys.stdout.flush()
         result = rtcm3.process_data(dump_decoded=False)
         while result != 0:

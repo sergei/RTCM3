@@ -5,22 +5,20 @@ from RTCM3_Decls import *
 import glob
 import RTCM3_Definition
 import sys
-import pprint
 from datetime import datetime
 
-RTCM3_Preamble = 0xD3;
-RTCM3_Max_Data_Length = 1023;
-RTCM3_First_Data_Location = 3 # Zero based
-RTCM3_Min_Size       = 6;
-RTCM3_Max_Data_Length = 1023;
-RTCM3_Max_Message_Length = RTCM3_Min_Size + RTCM3_Max_Data_Length;
-RTCM3_Length_Location = 1 # Zero Based
+RTCM3_Preamble = 0xD3
+RTCM3_First_Data_Location = 3  # Zero based
+RTCM3_Min_Size = 6
+RTCM3_Max_Data_Length = 1023
+RTCM3_Max_Message_Length = RTCM3_Min_Size + RTCM3_Max_Data_Length
+RTCM3_Length_Location = 1  # Zero Based
 
 
-#(*****************************************************************/
-#/*                     CRC24 LOOKUP TABLE                        */
-#/*****************************************************************)
-crc24table =  (
+# (*****************************************************************/
+# /*                     CRC24 LOOKUP TABLE                        */
+# /*****************************************************************)
+crc24table = (
  0x000000, 0x864CFB, 0x8AD50D, 0x0C99F6, 0x93E6E1, 0x15AA1A,
  0x1933EC, 0x9F7F17, 0xA18139, 0x27CDC2, 0x2B5434, 0xAD18CF,
  0x3267D8, 0xB42B23, 0xB8B2D5, 0x3EFE2E, 0xC54E89, 0x430272,
@@ -63,233 +61,226 @@ crc24table =  (
  0x0D61AB, 0x8B2D50, 0x145247, 0x921EBC, 0x9E874A, 0x18CBB1,
  0xE37B16, 0x6537ED, 0x69AE1B, 0xEFE2E0, 0x709DF7, 0xF6D10C,
  0xFA48FA, 0x7C0401, 0x42FA2F, 0xC4B6D4, 0xC82F22, 0x4E63D9,
- 0xD11CCE, 0x575035, 0x5BC9C3, 0xDD8538 );
+ 0xD11CCE, 0x575035, 0x5BC9C3, 0xDD8538)
+
+# Since the packets are alway small, and we have ram we make an list that each item is a single bit
+# It is also a slow way to do it
 
 
-
-# Since the packets are alway small, and we have ram we make an list that each item is a single bit. It is also a slow way to do it
-
-
-def makeBitArray(buffer):
-    current_index=0
-    bitArray = (len(buffer)*8)*['0']
-    for b in buffer:
-        for i in range(0,8):
+def makeBitArray(buffer_):
+    current_index = 0
+    bitArray = (len(buffer_)*8)*['0']
+    for b in buffer_:
+        for i in range(0, 8):
             if (b & 0x80) != 0:
-                bitArray[current_index]='1'
-            b<<=1
-            current_index+=1
-    return(bitArray)
+                bitArray[current_index] = '1'
+            b <<= 1
+            current_index += 1
+    return bitArray
 
-def bitValue(bitArray,Start,Length):
-#    print Start,Length
-    s = ""
-    for i in range (Start,Start+Length):
-        s +=bitArray[i]
-    return(int(s,2))
 
-def bitValueSigned(bitArray,Start,Length):
-#    print Start,Length
+def bitValue(bitArray, Start, Length):
+    #    print Start,Length
     s = ""
-    for i in range (Start,Start+Length):
-        s +=bitArray[i]
+    for i in range(Start, Start+Length):
+        s += bitArray[i]
+    return int(s, 2)
+
+
+def bitValueSigned(bitArray, Start, Length):
+    #    print Start,Length
+    s = ""
+    for i in range(Start, Start+Length):
+        s += bitArray[i]
 
     if bitArray[Start] == '0':
-        return(int(s,2))
+        return int(s, 2)
     else:
         # two's complement
-        return(-(((int(s,2) ^ (2**Length-1)) + 1)))
+        return -((int(s, 2) ^ (2**Length-1)) + 1)
 
-def bitValueGSigned(bitArray,Start,Length):
-#    print Start,Length
+
+def bitValueGSigned(bitArray, Start, Length):
+    #    print Start,Length
     s = ""
-    for i in range (Start,Start+Length):
-        s +=bitArray[i]
+    for i in range(Start, Start+Length):
+        s += bitArray[i]
 
     if bitArray[Start] == '0':
-        return(int(s,2))
+        return int(s, 2)
     else:
         # Sign bit is one, so negative
-        return -int(s[1:],2)
+        return -int(s[1:], 2)
 
-#(**********************************************************************
+
+# (**********************************************************************
 # * Compute the CRC24 checksum using a lookup table method.
 # *
 # *********************************************************************)
-def crc_normal (Message_Buffer):
-   crc = 0
-#   print "CRC Length: " + str(len(Message_Buffer))
-   for b in Message_Buffer:
-       crc = crc24table[((crc >> 16) ^ b) & 0xFF] ^ (crc << 8);
-   return(crc & 0xFFFFFF);
+def crc_normal(Message_Buffer):
+    crc = 0
+    #   print "CRC Length: " + str(len(Message_Buffer))
+    for b in Message_Buffer:
+        crc = crc24table[((crc >> 16) ^ b) & 0xFF] ^ (crc << 8)
+    return crc & 0xFFFFFF
 
 
 # ByteToHex From http://code.activestate.com/recipes/510399-byte-to-hex-and-hex-to-byte-string-conversion/
-
-def ByteToHex( byteStr ):
+def ByteToHex(byteStr):
     """
     Convert a byte string to it's hex string representation e.g. for output.
     """
 
-    hex = []
+    hex_ = []
     for aChar in byteStr:
-        hex.append( "%02X " % aChar )
+        hex_.append("%02X " % aChar)
 
-    return ''.join( hex ).strip()
-
+    return ''.join(hex_).strip()
 
 
 class RTCM3:
-    def __init__ (self,default_output_level):
-        self.undecoded=bytearray("")
-        self.buffer=bytearray("")
-        self.default_output_level=default_output_level
-        self.packet_ID=None
-        self.packet_Length=None
-        self.Dump_Levels=array("I")
-        self.commands={}
+    def __init__(self, default_output_level):
+        self.undecoded = bytearray("")
+        self.buffer = bytearray("")
+        self.default_output_level = default_output_level
+        self.packet = None
+        self.packet_ID = None
+        self.packet_Length = None
+        self.Dump_Levels = array("I")
+        self.commands = {}
 
-
-        for i in range (RTCM3_Min_Message_ID,RTCM3_Max_Message_ID):
+        for i in range(RTCM3_Min_Message_ID, RTCM3_Max_Message_ID):
             self.Dump_Levels.append(default_output_level)
 
         files = glob.glob("DEFS/*.RTCM3")
 
-        for file in files:
-            sys.stderr.write("Loading File: " + file +"\n")
+        for file_ in files:
+            sys.stderr.write("Loading File: " + file_ + "\n")
             rtcm3_Defs = RTCM3_Definition.rtcm3_Definition()
-            rtcm3_Defs.read_from_file(file)
-            sys.stderr.write ("Loaded Command: " + "{0}:{1}\n".format(rtcm3_Defs.Command_ID,rtcm3_Defs.Command_Name))
-            self.commands[rtcm3_Defs.Command_ID]=rtcm3_Defs
-#            self.commands.append(rtcm3_Defs)
-#        pprint.pprint (self.commands[1033].fields)
+            rtcm3_Defs.read_from_file(file_)
+            sys.stderr.write("Loaded Command: " + "{0}:{1}\n".format(rtcm3_Defs.Command_ID, rtcm3_Defs.Command_Name))
+            self.commands[rtcm3_Defs.Command_ID] = rtcm3_Defs
+            # self.commands.append(rtcm3_Defs)
 
+    def add_data(self, data):
+        # Add more received data into the system. Adding data does not mean that we will try and decode it.
+        self.buffer += data
+        # print len(self.buffer)
+        # print hexlify(self.buffer)
 
-    def add_data (self,data):
-    # Add more received data into the system. Adding data does not mean that we will try and decode it.
-        self.buffer+=data
-#        print len(self.buffer)
-#       print hexlify(self.buffer)
-
-    def decode(self,packet_ID, packet_data):
+    def decode(self, packet_ID, packet_data):
         if packet_ID in self.commands:
-            current_bit=0
-            bitArray=makeBitArray(packet_data)
-#            print "Bytes"
-#            print ByteToHex(packet_data)
-#            print packet_data
+            current_bit = 0
+            bitArray = makeBitArray(packet_data)
+            # print "Bytes"
+            # print ByteToHex(packet_data)
+            # print packet_data
             for field in self.commands[packet_ID].fields:
-#                print "Start Bit: " ,current_bit
-#                print field["name"]
-                if field["type"] == "UINT" :
-                    field["value"]= bitValue(bitArray,current_bit,field["bitlength"])
-                    current_bit+=field["bitlength"]
-                elif field["type"] == "INT" :
-                    field["value"]= bitValueSigned(bitArray,current_bit,field["bitlength"])
-                    current_bit+=field["bitlength"]
+                # print "Start Bit: " ,current_bit
+                # print field["name"]
+                if field["type"] == "UINT":
+                    field["value"] = bitValue(bitArray, current_bit, field["bitlength"])
+                    current_bit += field["bitlength"]
+                elif field["type"] == "INT":
+                    field["value"] = bitValueSigned(bitArray, current_bit, field["bitlength"])
+                    current_bit += field["bitlength"]
                 elif field["type"] == "GINT":
                     # Deals with GLO negative numbers
                     field["value"] = bitValueGSigned(bitArray, current_bit, field["bitlength"])
                     current_bit += field["bitlength"]
-                elif field["type"] == "REPEAT" :
-                    field["value"]= bitValue(bitArray,current_bit,field["bitlength"])
-                    current_bit+=field["bitlength"]
-                elif field["type"] == "PCHAR" :
-                    length=bitValue(bitArray,current_bit,8)
+                elif field["type"] == "REPEAT":
+                    field["value"] = bitValue(bitArray, current_bit, field["bitlength"])
+                    current_bit += field["bitlength"]
+                elif field["type"] == "PCHAR":
+                    length = bitValue(bitArray, current_bit, 8)
 #                    print "Length: {0} 0x{0:X}".format(length)
-                    current_bit+=8
-                    txt=""
-                    for i in range(0,length):
-                        txt+=chr(bitValue(bitArray,current_bit,8))
-                        current_bit+=8
-                    field["value"]=txt
-
+                    current_bit += 8
+                    txt = ""
+                    for i in range(0, length):
+                        txt += chr(bitValue(bitArray, current_bit, 8))
+                        current_bit += 8
+                    field["value"] = txt
 
         else:
-            sys.stderr.write("No Decoder for {0} length {1}\n".format(packet_ID,len(packet_data)))
+            sys.stderr.write("No Decoder for {0} length {1}\n".format(packet_ID, len(packet_data)))
 
+    # noinspection PyUnusedLocal
+    def process_data(self, dump_decoded=False):
 
-    def process_data (self, dump_decoded=False):
-
-        if len (self.buffer) <  RTCM3_Min_Size :
-            print "Too short"
+        if len(self.buffer) < RTCM3_Min_Size:
+            # print "Too short"
             return Need_More
 
-        if self.buffer[0] <> RTCM3_Preamble : # {It isn't a valid packet, skip to first start}
-            for i  in range (0,len(self.buffer)):
-    #                            print "in Did not get a STX: " + str(i)
-                if (self.buffer[0] != RTCM3_Preamble) :
-                    self.undecoded.append(self.buffer[0]);
-                    del self.buffer[0];
+        if self.buffer[0] != RTCM3_Preamble:  # {It isn't a valid packet, skip to first start}
+            for i in range(0, len(self.buffer)):
+                # print "in Did not get a STX: " + str(i)
+                if self.buffer[0] != RTCM3_Preamble:
+                    self.undecoded.append(self.buffer[0])
+                    del self.buffer[0]
                 else:
-                    break;
+                    break
             return Got_Undecoded
 
-        self.packet_Length = (self.buffer[RTCM3_Length_Location] & 0x03);
-        self.packet_Length = self.packet_Length << 8;
-        self.packet_Length = self.packet_Length | self.buffer[RTCM3_Length_Location+1];
-        print "Packet Length: {:X}".format(self.packet_Length)
+        self.packet_Length = (self.buffer[RTCM3_Length_Location] & 0x03)
+        self.packet_Length = self.packet_Length << 8
+        self.packet_Length = self.packet_Length | self.buffer[RTCM3_Length_Location+1]
+        # print "Packet Length: {:X}".format(self.packet_Length)
 
         if (self.packet_Length+RTCM3_Min_Size) > len(self.buffer):
             return Need_More
 
-        Computed_CRC = crc_normal(self.buffer[0:self.packet_Length+ RTCM3_First_Data_Location]);
+        Computed_CRC = crc_normal(self.buffer[0:self.packet_Length + RTCM3_First_Data_Location])
         print "Computed CRC {:X}".format(Computed_CRC)
-        CRC = self.buffer[RTCM3_First_Data_Location + self.packet_Length];
-        CRC = CRC << 8;
-        CRC = CRC | self.buffer[RTCM3_First_Data_Location + self.packet_Length+1];
-        CRC = CRC << 8;
-        CRC = CRC | self.buffer[RTCM3_First_Data_Location + self.packet_Length+2];
+        CRC = self.buffer[RTCM3_First_Data_Location + self.packet_Length]
+        CRC = CRC << 8
+        CRC = CRC | self.buffer[RTCM3_First_Data_Location + self.packet_Length+1]
+        CRC = CRC << 8
+        CRC = CRC | self.buffer[RTCM3_First_Data_Location + self.packet_Length+2]
         print "CRC {:X}".format(CRC)
 
-
         if CRC == Computed_CRC:
-            self.packet_ID = self.buffer[RTCM3_First_Data_Location];
-            self.packet_ID = self.packet_ID << 4;
-            self.packet_ID = self.packet_ID | ((self.buffer[RTCM3_First_Data_Location+1] >> 4) & 0x0F);
-            self.packet=self.buffer[:self.packet_Length + RTCM3_Min_Size]
+            self.packet_ID = self.buffer[RTCM3_First_Data_Location]
+            self.packet_ID = self.packet_ID << 4
+            self.packet_ID = self.packet_ID | ((self.buffer[RTCM3_First_Data_Location+1] >> 4) & 0x0F)
+            self.packet = self.buffer[:self.packet_Length + RTCM3_Min_Size]
             print "Packet"
             print ByteToHex(self.packet)
-            packet_data=self.packet[RTCM3_First_Data_Location:self.packet_Length+RTCM3_First_Data_Location] # The packet
-            self.buffer=self.buffer[self.packet_Length + RTCM3_Min_Size:]
-            self.undecoded=bytearray("")
-            self.decode(self.packet_ID,packet_data)
+            # The packet
+            packet_data = self.packet[RTCM3_First_Data_Location:self.packet_Length+RTCM3_First_Data_Location]
+            self.buffer = self.buffer[self.packet_Length + RTCM3_Min_Size:]
+            self.undecoded = bytearray("")
+            self.decode(self.packet_ID, packet_data)
             return Got_Packet
         else:
             print "Invalid"
-            del self.buffer[0] #Always delete the first byte since it failed the CRC
-            if self.buffer[0] <> RTCM3_Preamble : # {It isn't a valid packet, skip to first start}
-                for i  in range (0,len(self.buffer)):
-                    if (self.buffer[0] != RTCM3_Preamble) :
-                        self.undecoded.append(self.buffer[0]);
-                        del self.buffer[0];
+            del self.buffer[0]  # Always delete the first byte since it failed the CRC
+            if self.buffer[0] != RTCM3_Preamble:  # {It isn't a valid packet, skip to first start}
+                for i in range(0, len(self.buffer)):
+                    if self.buffer[0] != RTCM3_Preamble:
+                        self.undecoded.append(self.buffer[0])
+                        del self.buffer[0]
                     else:
-                        break;
+                        break
             return Got_Undecoded
 
-
-
-    def dump (self,dump_undecoded=False,dump_status=False,dump_decoded=False,dump_timestamp=False):
-        if self.Dump_Levels[self.packet_ID] :
-            if dump_timestamp :
-               print datetime.now()
-            if dump_decoded :
-                print "Packet Data: Length: {0}\n{1}".format(self.packet_Length,ByteToHex (self.packet))
+    # noinspection PyUnusedLocal
+    def dump(self, dump_undecoded=False, dump_status=False, dump_decoded=False, dump_timestamp=False):
+        if self.Dump_Levels[self.packet_ID]:
+            if dump_timestamp:
+                print datetime.now()
+            if dump_decoded:
+                print "Packet Data: Length: {0}\n{1}".format(self.packet_Length, ByteToHex(self.packet))
 
             if self.packet_ID in self.commands:
                 print ""
-                print str(self.packet_ID) + ": " + self.commands[self.packet_ID].Command_Name + " : " + str(self.packet_Length)
-                if self.Dump_Levels [self.packet_ID] > 1 :
-                   for field in self.commands[self.packet_ID].fields:
-                       print "{0}: {1}".format(field["name"],field["value"])
+                print (str(self.packet_ID) + ": " + self.commands[self.packet_ID].Command_Name +
+                       " : " + str(self.packet_Length))
+                if self.Dump_Levels[self.packet_ID] > 1:
+                    for field in self.commands[self.packet_ID].fields:
+                        print "{0}: {1}".format(field["name"], field["value"])
                 print ""
 
+        # self.Handlers[self.packet_ID].dump(self.Dump_Levels[self.packet_ID])
 
-
-
-#        self.Handlers[self.packet_ID].dump(self.Dump_Levels[self.packet_ID]);
-
-
-    def name (self):
+    def name(self):
         return str(self.packet_ID)
-
